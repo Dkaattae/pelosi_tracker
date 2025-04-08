@@ -1,0 +1,117 @@
+id: extract_from_docpdf
+namespace: houseclerk_transactions
+
+inputs: 
+  - id: year
+    type: SELECT
+    displayName: Select year
+    values: ['2021', '2022', '2023', '2024', '2025']
+    defaults: '2025'
+  - id: docid
+    type: STRING
+    displayName: Type in DocID end with '.pdf'
+
+variables:
+  staging_table: "public.houseclerk_trade_events_staging"
+  table: "public.houseclerk_trade_events"
+  data: "{{ outputs.scan_pdf.outputFiles['trade_events_' ~ outputs.scan_pdf.vars.docid ~ '.csv']}}"
+
+tasks:
+  - id: log-inputs
+    type: io.kestra.plugin.core.debug.Return
+    format: |
+      Running extract_from_docpdf with:
+      year = {{ inputs.year }}
+      docid = {{ inputs.docid }}
+
+  - id: scan_pdf
+    type: io.kestra.plugin.scripts.python.Commands
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:slim
+    warningOnStdErr: false
+    beforeCommands:
+      - pip install requests pandas pdfplumber kestra
+    outputFiles:
+      - "*.csv"
+    commands: 
+      - python scan_pdfdoc.py "{{ inputs.year }}" "{{ inputs.docid }}"
+
+  - id: trade_event_create_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.table)}} (
+            DocID                text,
+            ID                   integer,
+            Owner                text,
+            Asset                text,
+            Transaction_Type     text,
+            Date                 date,
+            Notification_Date    date,
+            Amount               text,
+            Filing_Status        text,
+            Description          text
+        );
+
+  - id: trade_event_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.staging_table)}} (
+            DocID                text,
+            ID                   integer,
+            Owner                text,
+            Asset                text,
+            Transaction_Type     text,
+            Date                 date,
+            Notification_Date    date,
+            Amount               text,
+            Filing_Status        text,
+            Description          text
+        );
+
+  - id: trade_event_truncate_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        TRUNCATE TABLE {{render(vars.staging_table)}};
+
+  - id: trade_event_copy_in_to_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.CopyIn
+    format: CSV
+    from: "{{render(vars.data)}}"
+    table: "{{render(vars.staging_table)}}"
+    header: true
+    columns: [ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description]
+
+  - id: trade_event_add_docid
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+          UPDATE {{render(vars.staging_table)}}
+          SET
+            DocID = '{{ inputs.docid }}';
+
+  - id: trade_event_merge_data
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        MERGE INTO {{render(vars.table)}} as T
+        USING {{render(vars.staging_table)}} as S
+        ON T.DocID = S.DocID
+        WHEN NOT MATCHED THEN
+          INSERT (
+            DocID, ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description
+          )
+          VALUES (
+            S.DocID, S.ID, S.Owner, S.Asset, S.Transaction_Type, S.Date, S.Notification_Date, S.Amount, S.Filing_Status, S.Description
+          );
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: This will remove output files. If you'd like to explore Kestra outputs, disable it.
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root

@@ -1,0 +1,119 @@
+id: postgres_transaction_index
+namespace: houseclerk_transactions
+
+concurrency:
+  limit: 1
+
+inputs: 
+  - id: year
+    type: SELECT
+    displayName: Select year
+    values: ['2021', '2022', '2023', '2024', '2025']
+    defaults: '2025'
+
+variables:
+  file: "{{inputs.year}}FD.xml"
+  staging_table: "public.doc_staging_{{inputs.year}}"
+  table: "public.docdata_{{inputs.year}}"
+  data: "{{outputs.unzip.files[inputs.year ~ 'FD' ~ '.txt']}}"
+
+tasks:
+  - id: set_label
+    type: io.kestra.plugin.core.execution.Labels
+    labels: 
+      file: "{{render(vars.file)}}"
+      year: "{{inputs.year}}"
+      
+  - id: download_zip
+    type: io.kestra.plugin.core.http.Download
+    uri: https://disclosures-clerk.house.gov/public_disc/financial-pdfs/{{ inputs.year }}FD.zip
+
+  - id: unzip
+    type: io.kestra.plugin.compress.ArchiveDecompress
+    algorithm: ZIP
+    from: "{{ outputs.download_zip.uri }}"
+
+  - id: file_index_create_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.table)}} (
+            Prefix              text,
+            Last                text,
+            First               text,
+            Suffix              text,
+            FilingType          text,
+            StateDst            text,
+            Year                integer,
+            FilingDate          text,
+            DocID               integer,
+            UpdatedTime         timestamp
+        );
+
+  - id: file_index_create_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.staging_table)}} (
+            Prefix              text,
+            Last                text,
+            First               text,
+            Suffix              text,
+            FilingType          text,
+            StateDst            text,
+            Year                integer,
+            FilingDate          text,
+            DocID               integer,
+            UpdatedTime         timestamp
+        );
+  
+  - id: file_index_truncate_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        TRUNCATE TABLE {{render(vars.staging_table)}};
+
+  - id: file_index_copy_in_to_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.CopyIn
+    format: TEXT
+    from: "{{render(vars.data)}}"
+    table: "{{render(vars.staging_table)}}"
+    header: true
+    columns: [Prefix, Last, First, Suffix, FilingType, StateDst, Year, FilingDate, DocID]
+
+  - id: add_updated_time
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        UPDATE {{render(vars.staging_table)}}
+          SET
+            UpdatedTime = CURRENT_TIMESTAMP;
+
+  - id: file_index_merge_data
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        MERGE INTO {{render(vars.table)}} as T
+        USING {{render(vars.staging_table)}} as S
+        ON T.DocID = S.DocID
+        WHEN NOT MATCHED THEN
+          INSERT (
+            Prefix, Last, First, Suffix, FilingType, StateDst, Year, FilingDate, DocID, UpdatedTime
+          )
+          VALUES (
+            S.Prefix, S.Last, S.First, S.Suffix, S.FilingType, S.StateDst, S.Year, S.FilingDate, S.DocID, S.UpdatedTime
+          );
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: This will remove output files. If you'd like to explore Kestra outputs, disable it.
+
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root
+
+
+triggers:
+  - id: file_index_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 9 1 * *"
+    disabled: true

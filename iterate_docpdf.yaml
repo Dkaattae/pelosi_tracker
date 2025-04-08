@@ -1,0 +1,46 @@
+id: iterate_docpdf
+namespace: houseclerk_transactions
+
+inputs: 
+  - id: year
+    type: SELECT
+    displayName: Select year
+    values: ['2021', '2022', '2023', '2024', '2025']
+    defaults: '2025'
+
+variables:
+  table: "public.docdata_{{inputs.year}}"
+
+tasks:
+  - id: extract
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+      SELECT Year, DocID
+      from {{render(vars.table)}}
+      where Last = 'Pelosi'
+    store: true
+
+  - id: convert_to_jsonl
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.extract.outputs[0].uri }}"  
+    newLine: true  
+
+  - id: each
+    type: io.kestra.plugin.core.flow.ForEachItem
+    items: "{{ outputs.convert_to_jsonl.uri }}"
+    batch:
+      rows: 1
+    namespace: houseclerk_transactions
+    flowId: extract_from_docpdf
+    wait: true # wait for the subflow execution
+    transmitFailed: true # fail the task run if the subflow execution fails
+    inputs:
+      year: "{{ json(read(taskrun.items)).year }}" 
+      docid: "{{ json(read(taskrun.items)).docid }}.pdf"
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root
