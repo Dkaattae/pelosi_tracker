@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: doc_data
+    description: >
+      combine doc index from past years and current years
+  
+  - name: trading_count 
+    description: >
+      trading events count each year
+  
+  - name: trading_profit_stocks
+    description: >
+      calculating estimated trading profits from trading public stocks, derivatives and bonds

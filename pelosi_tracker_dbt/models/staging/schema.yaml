@@ -1,0 +1,108 @@
+version: 2
+
+sources:
+  - name: staging
+    database: "transaction_file"
+    schema: "public"
+    tables:
+      - name: docdata_2025
+      - name: docdata_2024
+      - name: docdata_2023
+      - name: houseclerk_trade_events
+
+models:
+  - name: stg_docdata_past
+    description: >
+      index table contains name docid and filing type
+    columns:
+      - name: prefix
+        description: representative's prefix in name
+      - name: last
+        description: representative's last name
+      - name: first
+        description: representative's first name
+      - name: suffix
+        description: representative's suffix in name
+      - name: filingtype
+        description: filingtype
+      - name: statedst
+        description: state and district
+      - name: clerkstate
+        description: state from statedst
+      - name: year
+        description: filing year, input to url downloading file
+      - name: filingdate
+        description: filingdate
+      - name: docid
+        description: primary key, id put in url to download doc file
+      - name: updatedtime
+        description: date when load to table
+  
+  - name: stg_docdata_current_year
+    description: >
+      index table contains name docid and filing type
+    columns:
+      - name: prefix
+        description: representative's prefix in name
+      - name: last
+        description: representative's last name
+      - name: first
+        description: representative's first name
+      - name: suffix
+        description: representative's suffix in name
+      - name: filingtype
+        description: filingtype
+      - name: statedst
+        description: state and district
+      - name: clerkstate
+        description: state from statedst
+      - name: year
+        description: filing year, input to url downloading file
+      - name: filingdate
+        description: filingdate
+      - name: docid
+        description: primary key, id put in url to download doc file
+      - name: updatedtime
+        description: date when load to table
+
+  - name: stg_trade_events
+    description: >
+      trading events in doc file
+    columns:
+      - name: docid
+        description: filing docid 
+      - name: id
+        description: id in file, usually null
+      - name: owner
+        description: owner in file
+      - name: asset
+      - name: asset_type
+        description: asset type is inside [] of asset, description in seeds
+      - name: asset_ticker
+        description: asset ticker is inside () of asset if it is stock
+      - name: transaction_type
+        description: p means purchased, s means sold
+      - name: date
+        description: trading date
+      - name: notification_date
+      - name: amount
+        description: purchased/sold amount range in doller
+      - name: amount_range_low
+        description: lower range in amount
+      - name: amount_range_high
+        description: higher range in amount
+      - name: filing_status
+        description: filing status in file, usually new
+      - name: description
+      - name: number_of_shares
+        description: number of shares in description, if asset is stock
+      - name: option_type
+        description: type of option, call/put
+      - name: number_of_options
+        description: number of options in description, if asset is option
+      - name: strike_price
+        description: strike price of options in description, if asset is option
+      - name: expiration_date
+        description: expiration date of options in description, if asset is option
+      - name: purchase_date_option
+        description: options purchased date in description, if exercising option

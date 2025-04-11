@@ -5,6 +5,8 @@ from math import floor
 import sys
 from kestra import Kestra
 from io import StringIO
+import json
+
 
 def download_reporting_pdf(year, file_number):
 	url = f"https://disclosures-clerk.house.gov/public_disc/ptr-pdfs/{year}/{file_number}"
@@ -96,7 +98,7 @@ def combine_rows(pdf_list):
 	for row in pdf_list:
 		if row[1] == 'ID' or row[4] == 'Type' or row[7].find('?') != -1:
 			continue
-		if row[3] != '':
+		if row[3] != '' and row[4] != '' and '\x00' not in row[3]:
 			trade_event = {}
 			trade_event['ID'] = row[1]
 			trade_event['Owner'] = row[2]
@@ -106,7 +108,7 @@ def combine_rows(pdf_list):
 			trade_event['Notification Date'] = row[6]
 			trade_event['Amount'] = row[7]
 			trade_list.append(trade_event)
-		if row[2] == '' and '\x00' not in row[3]:
+		if row[3].find('[') != -1 and row[3].find(']') != -1 and row[4] == '' and '\x00' not in row[3]:
 			trade_event = trade_list[-1]
 			trade_event['Asset'] += ' ' + row[3]
 			trade_event['Amount'] += ' ' + row[7]
@@ -120,23 +122,29 @@ def combine_rows(pdf_list):
 
 
 if __name__ == "__main__":
-	input_data = sys.argv[1:]  # Read from command-line args
-	year = sys.argv[1]
-	file_number = sys.argv[2]
-	docid = file_number.split(".")[0]
-	download_reporting_pdf(year, file_number)
-	columns = get_column_location(file_number)
-	pdf_list = extract_table_custom(file_number, columns)
-	trade_list = combine_rows(pdf_list)
-	df = pd.DataFrame(trade_list)
-	df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
-	trade_df = df[~pd.isnull(df['Date'])]
-	trade_df.rename(columns={'Transaction Type': 'Transaction_Type', 'Notification Date': 'Notification_Date', 'Filing Status': 'Filing_Status'}, inplace=True)
-	csv_str = trade_df.to_csv(index=False)
-	# trade_df.to_csv(f'trade_events_{docid}.csv', index=False)
+	input_data = sys.argv[1]  # Read from command-line args
+	data = json.loads(input_data)
+	trade_event_df = pd.DataFrame()
+	for each_input in data:
+		year = each_input['year']
+		docid = each_input['docid']
+		file_number = f'{docid}.pdf'
+		download_reporting_pdf(year, file_number)
+		columns = get_column_location(file_number)
+		if columns == []:
+			print(f'cannot scan file {file_number}')
+			continue
+		pdf_list = extract_table_custom(file_number, columns)
+		trade_list = combine_rows(pdf_list)
+		df = pd.DataFrame(trade_list)
+		df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
+		trade_df = df[~pd.isnull(df['Date'])]
+		trade_df_rename = trade_df.rename(columns={'Transaction Type': 'Transaction_Type', 'Notification Date': 'Notification_Date', 'Filing Status': 'Filing_Status'})
+		trade_df_rename['docid'] = docid
+		trade_event_df = pd.concat([trade_event_df, trade_df_rename], ignore_index=True)
+		# csv_str = trade_df.to_csv(index=False)
+	trade_event_df.to_csv('trade_events.csv', index=False)
 	outputs = {
-		'docid': docid,
-		'csv_str': csv_str,
-		'trade_event_count': len(trade_df)
+		'trade_event_count': len(trade_event_df)
 	}
 	Kestra.outputs(outputs)
