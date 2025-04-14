@@ -1,0 +1,53 @@
+id: postgres_dbt
+namespace: houseclerk_transactions
+inputs:
+  - id: dbt_command
+    type: SELECT
+    allowCustomValue: true
+    defaults: dbt build
+    values:
+      - dbt build
+      - dbt debug # use when running the first time to validate DB connection
+tasks:
+  - id: sync
+    type: io.kestra.plugin.git.SyncNamespaceFiles
+    url: https://github.com/Dkaattae/pelosi_tracker
+    branch: main
+    namespace: "{{ flow.namespace }}"
+    gitDirectory: pelosi_tracker_dbt
+    dryRun: false
+    # disabled: true # this Git Sync is needed only when running it the first time, afterwards the task can be disabled
+
+  - id: dbt-build
+    type: io.kestra.plugin.dbt.cli.DbtCLI
+    env:
+      DBT_DATABASE: transaction_file
+      DBT_SCHEMA: public
+    namespaceFiles:
+      enabled: true
+    containerImage: ghcr.io/kestra-io/dbt-postgres:latest
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+      networkMode: host
+    commands:
+      - dbt deps
+      - "{{ inputs.dbt_command }}"
+    storeManifest:
+      key: manifest.json
+      namespace: "{{ flow.namespace }}"
+    profiles: |
+      default:
+        outputs:
+          dev:
+            type: postgres
+            host: host.docker.internal
+            user: root
+            password: root
+            port: 5432
+            dbname: transaction_file
+            schema: public
+            threads: 8
+            connect_timeout: 10
+            priority: interactive
+        target: dev
+
