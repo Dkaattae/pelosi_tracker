@@ -26,10 +26,10 @@ Steps:
 Docker-compose up -d   
 This command will spin up kestra, db for kestra, Postgres database and pgadmin    
 
-Run flows to load data into database  
-1), run download_index_flow.yml first to load index into table docdata_<year>
-2), import file scan_pdf_doc_batch.py into kestra
-3), run iterate_docpdf.yml to scan pdf and load data into table houseclerk_trade_events
+Run flows to load data into database     
+1), run download_index_flow.yml first to load index into table docdata_<year>   
+2), import file scan_pdf_doc_batch.py into kestra   
+3), run iterate_docpdf_batch.yml to scan pdf and load data into table houseclerk_trade_events    
 
 2, dbt   
 Pip install dbt[postgres] if not installed   
