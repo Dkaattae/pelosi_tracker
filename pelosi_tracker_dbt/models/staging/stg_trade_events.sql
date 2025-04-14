@@ -10,10 +10,12 @@ with trade_events as (
 )
 
 select 
-    docid, id, owner,
+    cast(docid as int) as docid, 
+    id, 
+    owner,
     asset,
-    regexp_matches(asset, '\[(.*?)\]') as asset_type,
-    regexp_matches(asset, '\((.*?)\)') as asset_ticker,
+    (regexp_matches(asset, '\[(.*?)\]'))[1] as asset_type,
+    (regexp_matches(asset, '\((.*?)\)'))[1] as asset_ticker,
     transaction_type,
     date, notification_date,
     amount,
@@ -28,7 +30,7 @@ select
         '',
         'g'
     )::int AS number_of_shares,
-    (REGEXP_MATCHES(description, '(\S+)\s*options'))[1]
+    lower((REGEXP_MATCHES(description, '(\S+)\s*options'))[1])
          AS option_type,
     REGEXP_REPLACE((
         REGEXP_MATCHES(description, '([\d,]+)\s+(call|put)\s+options'))[1],
@@ -36,11 +38,15 @@ select
         '',
         'g'
     )::int AS number_of_options,
-    (REGEXP_MATCHES(
-		REGEXP_REPLACE(description, '.*strike\s*', ''),
-    		'\$([0-9,.]+)'
-  			))[1]::int
-		 AS strike_price,
+    REGEXP_REPLACE((
+		REGEXP_MATCHES(
+			REGEXP_REPLACE(description, '.*strike\s*', ''),
+    			'\$([0-9,.]+)'
+  				))[1],
+        	',',
+        	'',
+        	'g'
+    	)::float AS strike_price,
     TO_DATE(
         (REGEXP_MATCHES(
             REGEXP_REPLACE(description, '.*expir\s*', ''),

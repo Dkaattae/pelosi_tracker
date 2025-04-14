@@ -1,0 +1,9 @@
+version: 2
+
+seeds:
+  - name: Asset_Code_Description
+    description: >
+      asset type code explanation
+    columns:
+      - name: asset_code
+      - name: asset_name

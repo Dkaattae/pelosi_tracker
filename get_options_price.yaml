@@ -1,0 +1,54 @@
+id: get_options_price
+namespace: houseclerk_transactions
+description: |
+    goal: download options data from alphavantage api
+
+
+tasks:
+  - id: extract
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+      select 
+        asset_ticker as symbol,
+        date,
+        strike_price as strike,
+        expiration_date as expiration,
+        option_type as type
+      from trade_events_detail
+      where asset_type = 'OP'
+        and option_type is not null
+        and expiration_date is not null
+    store: true
+
+  - id: convert_to_json
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.extract.outputs[0].uri }}"  
+    newLine: false  
+
+
+  - id: load_options_price
+    type: io.kestra.plugin.scripts.python.Commands
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:slim
+    warningOnStdErr: false
+    beforeCommands:
+      - pip install pandas "dlt[postgres]" 
+    env:
+      DESTINATION__POSTGRES__CREDENTIALS: "postgresql://root:root@host.docker.internal:5432/transaction_file"
+    commands:
+      - python get_option_price.py '{{ json(read(outputs.convert_to_json.uri)) }}'
+    disabled: false
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: This will remove output files. If you'd like to explore Kestra outputs, disable it.
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root

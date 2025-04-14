@@ -5,6 +5,8 @@ volumes:
     driver: local
   postgres-transaction-file:
     driver: local
+  metabase-data:
+    driver: local
 
 services:
   postgres:
@@ -78,7 +80,7 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      postgres:
+      postgres_files:
         condition: service_started
 
   postgres_files:
@@ -92,6 +94,35 @@ services:
       POSTGRES_PASSWORD: root
     ports:
       - "5432:5432"
+
+  metabase-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: metabase
+      POSTGRES_PASSWORD: mbpass
+      POSTGRES_DB: metabase
+    volumes:
+      - metabase-data:/var/lib/postgresql/data
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres_files:
+        condition: service_started
+      metabase-db:
+        condition: service_started
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: mbpass
+      MB_DB_HOST: metabase-db
+    
     
 
 networks:

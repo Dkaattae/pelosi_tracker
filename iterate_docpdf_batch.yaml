@@ -20,8 +20,7 @@ tasks:
     sql: |
       SELECT Year, DocID
       from {{render(vars.index_table)}}
-      where left(statedst, 2) in ('NY', 'NJ')
-        and filingtype = 'P'
+      where filingtype = 'P'
     store: true
 
   - id: convert_to_json
@@ -57,8 +56,8 @@ tasks:
             Notification_Date    date,
             Amount               text,
             Filing_Status        text,
-            DocID                text,
-            Description          text
+            Description          text,
+            DocID                text
         );
 
   - id: trade_event_staging_table
@@ -73,8 +72,8 @@ tasks:
             Notification_Date    date,
             Amount               text,
             Filing_Status        text,
-            DocID                text,
-            Description          text
+            Description          text,
+            DocID                text
         );
 
   - id: trade_event_truncate_staging_table
@@ -88,7 +87,7 @@ tasks:
     from: "{{render(vars.data)}}"
     table: "{{render(vars.staging_table)}}"
     header: true
-    columns: [ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, docid, Description]
+    columns: [ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description, docid]
 
   - id: trade_event_merge_data
     type: io.kestra.plugin.jdbc.postgresql.Queries
@@ -98,10 +97,10 @@ tasks:
         ON T.DocID = S.DocID
         WHEN NOT MATCHED THEN
           INSERT (
-            DocID, ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description
+            ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description, DocID
           )
           VALUES (
-            S.DocID, S.ID, S.Owner, S.Asset, S.Transaction_Type, S.Date, S.Notification_Date, S.Amount, S.Filing_Status, S.Description
+            S.ID, S.Owner, S.Asset, S.Transaction_Type, S.Date, S.Notification_Date, S.Amount, S.Filing_Status, S.Description, S.DocID
           );
 
   - id: purge_files

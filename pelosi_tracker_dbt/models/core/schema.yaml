@@ -1,13 +1,25 @@
 version: 2
 
 models:
+  - name: asset_type_lookup
+    description: >
+      read from csv file
+
+  - name: trade_events_detail
+    description: >
+      extract neccesary information to get stock/option prices
+
   - name: doc_data
     description: >
       combine doc index from past years and current years
   
   - name: trading_count 
     description: >
-      trading events count each year
+      trading events count each state 
+  
+  - name: event_count_by_asset_type
+    description: >
+      event count by asset type
   
   - name: trading_profit_stocks
     description: >
