@@ -1,6 +1,7 @@
 ## Description: 
 Retail traders always saying Pelosi has insider information so that she made a lot of money.
-Let’s track how house clerks trade
+Let’s track how house clerks trade   
+This project is completely local. (because i do not have gcp credits anymore.)
 
 ## Overview:
 <img width="977" alt="Screenshot 2025-04-10 at 9 37 44 PM" src="https://github.com/user-attachments/assets/b5477994-e434-4f8e-8b02-523a303a344b" />
