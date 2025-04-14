@@ -1,6 +1,7 @@
 ## Description: 
 Retail traders always saying Pelosi has insider information so that she made a lot of money.
-Let’s track how house clerks trade
+Let’s track how house clerks trade   
+This project is completely local. (because i do not have gcp credits anymore.)
 
 ## Overview:
 <img width="977" alt="Screenshot 2025-04-10 at 9 37 44 PM" src="https://github.com/user-attachments/assets/b5477994-e434-4f8e-8b02-523a303a344b" />
@@ -25,7 +26,10 @@ Steps:
 Docker-compose up -d   
 This command will spin up kestra, db for kestra, Postgres database and pgadmin    
 
-Run flows to load data into database   
+Run flows to load data into database  
+1), run download_index_flow.yml first to load index into table docdata_<year>
+2), import file scan_pdf_doc_batch.py into kestra
+3), run iterate_docpdf.yml to scan pdf and load data into table houseclerk_trade_events
 
 2, dbt   
 Pip install dbt[postgres] if not installed   
@@ -34,7 +38,7 @@ dbt init <project name>
 Then make changes to files in project   
 dbt built   
 
- running kestra transform_trading_events.yaml in production
+ running kestra postgres_dbt.yaml in production
 
 3, dlt   
 Pip install dlt[postgres]   
@@ -44,7 +48,9 @@ Run load_options_prices.py
 
 i setup a kv store, key is alpha_vantage_api_key.   
 get your free api key here: https://www.alphavantage.co/support/#api-key   
-Run kestra flow in production   
+limit 25requests/day
+import load_options_prices.py into kestra
+run kestra get_option_price.yml in kestra
 note: flow 'get_options_price.yaml' is running after dbt.    
 
 4, metabase    
