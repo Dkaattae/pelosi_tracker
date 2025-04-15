@@ -1,0 +1,128 @@
+id: iterate_docpdf_incremental
+namespace: houseclerk_transactions
+
+inputs: 
+  - id: year
+    type: SELECT
+    displayName: Select year
+    values: ['2021', '2022', '2023', '2024', '2025']
+    defaults: '2025'
+
+variables:
+  index_table: "public.docdata_2025"
+  staging_table: "public.houseclerk_trade_events_staging"
+  table: "public.houseclerk_trade_events"
+  data: "{{ outputs.scan_pdf_batch.outputFiles['trade_events.csv']}}"
+
+tasks:
+  - id: extract
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+      select Year, DocID
+      from public.docdata_2025
+      where filingtype = 'P'
+        and docid not in (
+              select cast(docid as integer) as docid_int
+              from public.houseclerk_trade_events
+              where extract(year from notification_date) = 2025
+              group by docid_int
+              )
+    store: true
+
+  - id: convert_to_json
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.extract.outputs[0].uri }}"  
+    newLine: false  
+
+  # change this to loop inside python 
+  - id: scan_pdf_batch
+    type: io.kestra.plugin.scripts.python.Commands
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:slim
+    warningOnStdErr: false
+    beforeCommands:
+      - pip install requests pandas pdfplumber kestra
+    outputFiles:
+      - "*.csv"
+    commands: 
+      - python scan_pdf_doc_batch.py '{{ json(read(outputs.convert_to_json.uri)) }}'
+
+  - id: trade_event_create_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.table)}} (
+            ID                   integer,
+            Owner                text,
+            Asset                text,
+            Transaction_Type     text,
+            Date                 date,
+            Notification_Date    date,
+            Amount               text,
+            Filing_Status        text,
+            Description          text,
+            DocID                text
+        );
+
+  - id: trade_event_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.staging_table)}} (
+            ID                   integer,
+            Owner                text,
+            Asset                text,
+            Transaction_Type     text,
+            Date                 date,
+            Notification_Date    date,
+            Amount               text,
+            Filing_Status        text,
+            Description          text,
+            DocID                text
+        );
+
+  - id: trade_event_truncate_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        TRUNCATE TABLE {{render(vars.staging_table)}};
+
+  - id: trade_event_copy_in_to_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.CopyIn
+    format: CSV
+    from: "{{render(vars.data)}}"
+    table: "{{render(vars.staging_table)}}"
+    header: true
+    columns: [ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description, docid]
+
+  - id: trade_event_merge_data
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        MERGE INTO {{render(vars.table)}} as T
+        USING {{render(vars.staging_table)}} as S
+        ON T.DocID = S.DocID
+        WHEN NOT MATCHED THEN
+          INSERT (
+            ID, Owner, Asset, Transaction_Type, Date, Notification_Date, Amount, Filing_Status, Description, DocID
+          )
+          VALUES (
+            S.ID, S.Owner, S.Asset, S.Transaction_Type, S.Date, S.Notification_Date, S.Amount, S.Filing_Status, S.Description, S.DocID
+          );
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: This will remove output files. If you'd like to explore Kestra outputs, disable it.
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root
+
+triggers:
+  - id: schedule_2025
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 10 1 * *"
+    inputs:
+      year: '2025'
