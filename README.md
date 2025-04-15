@@ -21,39 +21,53 @@ Note: some files are delivered in person which do not look like those e-filled p
 4, dbt to transform data   
 5, metabase for dashboard   
 
-Steps:
-1, kestra   
-Docker-compose up -d   
-This command will spin up kestra, db for kestra, Postgres database and pgadmin    
+## Steps:
+#### 1, kestra
 
-Run flows to load data into database     
+`Docker-compose up -d `    
+
+This command will spin up kestra, Postgres database, pgadmin and metabase.   
+note: there are two other databases, for kestra internal use and metabase internal use.  
+
+Run flows:    
 1), run download_index_flow.yml first to load index into table docdata_<year>   
+    initial load need to manually iterate over years you want to download.   
+    the flow is scheduled first day of every month on 9am to download year 2025 index and load new data into table.   
+    trigger could be changed to daily.   
 2), import file scan_pdf_doc_batch.py into kestra   
-3), run iterate_docpdf_batch.yml to scan pdf and load data into table houseclerk_trade_events    
+3), run iterate_docpdf_batch.yml to scan pdf and initially load data into table houseclerk_trade_events      
+    first time need to mannually iterate years wanted.   
+    run iterate_docpdf_incremental.yml to scan new docs.   
+    incremental loading is scheduled first day of every month on 10am to download new pdf doc and load into table.   
+    trigger could be changed to daily.   
 
-2, dbt   
+#### 2, dbt
+
+* in development    
 Pip install dbt[postgres] if not installed   
 Then follow prompts to fill out info listed in docker compose yaml file.   
 dbt init <project name>   
 Then make changes to files in project   
 dbt built   
 
- running kestra postgres_dbt.yaml in production
+* in production   
+running kestra postgres_dbt.yaml
 
-3, dlt   
+#### 3, dlt
+* in development   
 Pip install dlt[postgres]   
 dlt init <project name>   
 Then change secrets.toml with Postgres info listed in docker compose yaml   
 Run load_options_prices.py   
-
-i setup a kv store, key is alpha_vantage_api_key.   
+* in production     
+i setup a kv store, key is 'ALPHA_VANTAGE_API_KEY'.   
 get your free api key here: https://www.alphavantage.co/support/#api-key   
-limit 25requests/day
+limit 25 requests/day
 import load_options_prices.py into kestra
 run kestra get_option_price.yml in kestra
 note: flow 'get_options_price.yaml' is running after dbt.    
 
-4, metabase    
+#### 4, metabase    
 go to localhost:3000    
 then setup metabase connection by following prompt. information are in docker compose file   
 
