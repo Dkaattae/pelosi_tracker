@@ -5,10 +5,11 @@ sources:
     database: "transaction_file"
     schema: "public"
     tables:
+      - name: houseclerk_trade_events
       - name: docdata_2025
       - name: docdata_2024
       - name: docdata_2023
-      - name: houseclerk_trade_events
+      
 
 models:
   - name: stg_docdata_past
