@@ -47,7 +47,7 @@ if __name__ == "__main__":
             try:
                 stock_data.append(get_stock_price(txn))
             except Exception as e:
-                error_log.append(["ticker": txn['ticker'], "date": txn['date'], "error": e])
+                error_log.append({"ticker": txn['ticker'], "date": txn['date'], "error": e})
     file_path = 'stock_data.csv'
     with open(file_path, 'w', newline='') as file:
         writer = csv.writer(file)
