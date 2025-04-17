@@ -9,6 +9,7 @@ sources:
       - name: docdata_2025
       - name: docdata_2024
       - name: docdata_2023
+      - name: stock_data
       
 
 models:

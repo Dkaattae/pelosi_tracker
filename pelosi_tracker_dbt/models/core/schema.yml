@@ -21,6 +21,10 @@ models:
     description: >
       event count by asset type
   
+  - name: trading_stocks_value
+    description: >
+      find the stock price trading range
+
   - name: trading_profit_stocks
     description: >
       calculating estimated trading profits from trading public stocks, derivatives and bonds

@@ -5,7 +5,7 @@
 }}
 
 with trade_events as (
-    select *
+    select * 
     from {{ source('staging', 'houseclerk_trade_events') }}
 )
 

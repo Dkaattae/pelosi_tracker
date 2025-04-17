@@ -1,0 +1,112 @@
+id: get_stock_price
+namespace: houseclerk_transactions
+description: |
+    goal: download stock data from yfinance
+
+inputs: 
+  - id: year
+    type: SELECT
+    displayName: Select year
+    values: ['2021', '2022', '2023', '2024', '2025']
+    defaults: '2025'
+
+variables:
+  stock_table: "public.stock_data"
+  staging_stock_table: "public.stock_data_staging"
+  data: "{{ outputs.get_stock_price.outputFiles['stock_data.csv']}}"
+
+tasks:
+  - id: extract
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+      select 
+        trade_events_detail.asset_ticker as ticker
+      from trade_events_detail
+      where asset_type = 'ST'
+        and extract(year from trade_events_detail.date) = cast({{ render(inputs.year) }} as int)
+        and asset_ticker is not null
+      group by ticker
+    store: true
+
+  - id: convert_to_json
+    type: io.kestra.plugin.serdes.json.IonToJson
+    from: "{{ outputs.extract.outputs[0].uri }}"  
+    newLine: false
+
+  - id: get_stock_price
+    type: io.kestra.plugin.scripts.python.Commands
+    namespaceFiles:
+      enabled: true
+    taskRunner:
+      type: io.kestra.plugin.scripts.runner.docker.Docker
+    containerImage: python:slim
+    warningOnStdErr: false
+    beforeCommands:
+      - pip install yfinance pandas
+    outputFiles:
+      - "*.csv"
+    commands:
+      - python get_stock_price.py '{{ json(read(outputs.convert_to_json.uri)) }}' '{{ inputs.year }}'
+    disabled: false
+
+  - id: create_stock_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.stock_table)}} (
+            ticker              text,
+            date                date,
+            high_price          double precision,
+            low_price           double precision,
+            closing_price       double precision
+        );
+
+  - id: staging_stock_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        CREATE TABLE IF NOT EXISTS {{render(vars.staging_stock_table)}} (
+            ticker              text,
+            date                date,
+            high_price          double precision,
+            low_price           double precision,
+            closing_price       double precision
+        );
+
+  - id: truncate_stock_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        TRUNCATE TABLE {{render(vars.staging_stock_table)}};
+
+  - id: copy_into_stock_staging_table
+    type: io.kestra.plugin.jdbc.postgresql.CopyIn
+    format: CSV
+    from: "{{render(vars.data)}}"
+    table: "{{render(vars.staging_stock_table)}}"
+    header: true
+    columns: [ticker, date, high_price, low_price, closing_price]
+
+  - id: trade_event_merge_data
+    type: io.kestra.plugin.jdbc.postgresql.Queries
+    sql: |
+        MERGE INTO {{render(vars.stock_table)}} as T
+        USING {{render(vars.staging_stock_table)}} as S
+        ON T.ticker = S.ticker
+          and T.date = S.date
+        WHEN NOT MATCHED THEN
+          INSERT (
+            ticker, date, high_price, low_price, closing_price
+          )
+          VALUES (
+            S.ticker, S.date, S.high_price, S.low_price, S.closing_price
+          );
+
+  - id: purge_files
+    type: io.kestra.plugin.core.storage.PurgeCurrentExecutionFiles
+    description: This will remove output files. If you'd like to explore Kestra outputs, disable it.
+    disabled: false
+
+pluginDefaults:
+  - type: io.kestra.plugin.jdbc.postgresql
+    values: 
+      url: jdbc:postgresql://host.docker.internal:5432/transaction_file
+      username: root
+      password: root

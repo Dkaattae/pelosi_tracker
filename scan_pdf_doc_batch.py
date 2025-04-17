@@ -143,8 +143,10 @@ if __name__ == "__main__":
 		trade_df_rename['docid'] = docid
 		trade_event_df = pd.concat([trade_event_df, trade_df_rename], ignore_index=True)
 		# csv_str = trade_df.to_csv(index=False)
-	trade_event_df.to_csv('trade_events.csv', index=False)
+	columns = ['ID', 'Owner', 'Asset', 'Transaction_Type', 'Date', 'Notification_Date', 'Amount', 'Filing_Status', 'Description', 'DocID']
+	trade_event_df_order = trade_event_df[columns]
+	trade_event_df_order.to_csv('trade_events.csv', index=False)
 	outputs = {
-		'trade_event_count': len(trade_event_df)
+		'trade_event_count': len(trade_event_df_order)
 	}
 	Kestra.outputs(outputs)
