@@ -51,7 +51,9 @@ Then make changes to files in project
 dbt built   
 
 * in production   
-running kestra postgres_dbt.yaml
+running kestra postgres_dbt.yaml   
+select command `dbt build --select +trade_events_detail`
+
 
 #### 3, dlt
 * in development   
@@ -65,9 +67,19 @@ get your free api key here: https://www.alphavantage.co/support/#api-key
 limit 25 requests/day
 import load_options_prices.py into kestra
 run kestra get_option_price.yml in kestra
-note: flow 'get_options_price.yaml' is running after dbt.    
+note: flow 'get_options_price.yaml' is running after dbt.
 
-#### 4, metabase    
+#### 4, download stock price   
+import get_stock_price.py into kestra,   
+then run get_stock_price.yaml in kestra.     
+the flow will download stock data from yfinance and save ti csv, create a stock data table, stock data staging table,      
+load csv into staging table, then merge into stock data table.     
+
+#### 5, transform stock data   
+in kestra, run postgres_dbt.yaml,   
+select command `dbt build`   
+
+#### 6, metabase    
 go to localhost:3000    
 then setup metabase connection by following prompt. information are in docker compose file   
 
