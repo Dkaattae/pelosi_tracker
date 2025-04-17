@@ -91,6 +91,12 @@ Dashboard
 
 <img width="1064" alt="Screenshot 2025-04-13 at 11 14 39 PM" src="https://github.com/user-attachments/assets/91926c6e-f4a4-417c-b542-2d56cbef84cf" />
 
-i only downloaded data in 2024 and 2025 for this dashboard, historical data is open to download.   
-stock is most favorable for house clerk of representatives.    
-Pelosi is not even the most aggresive trader in house. 
+pelosi trading history
+![Screenshot 2025-04-17 at 11 12 35 AM](https://github.com/user-attachments/assets/6667eab3-6889-416d-9f8f-1825313af2c5)
+
+
+
+stock is most favorable for house clerk of representatives.       
+Retail investors closely follow Pelosi's trades because she discloses the number of shares and detailed information about options contracts. In contrast, most members of the House of Representatives only report the transaction amount within a required range.
+It's also common for House disclosures to include investments held by third-party firms. This often results in multiple entries for the same stock due to block trading, with slight variations in trade prices.   
+note: i only downloaded data in 2024 and 2025 for this dashboard, historical data is open to download.   
