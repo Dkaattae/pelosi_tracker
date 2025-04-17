@@ -60,3 +60,4 @@ select
             'g'
     ) AS purchase_date_option
 from trade_events
+where docid ~ '^[0-9\.]+$'
